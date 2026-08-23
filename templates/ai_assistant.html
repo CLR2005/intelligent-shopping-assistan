@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能导购助手</title>
+    <style>
+        /* 全局重置和字体 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        }
+
+        /* 全屏布局：整页纵向排列，聊天区占满剩余空间 */
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            background: #f5f6fa;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ----- 顶部导航栏 ----- */
+        .navbar {
+            flex-shrink: 0;
+            padding: 14px 28px;
+            background: #ffffff;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-icon {
+            width: 34px;
+            height: 34px;
+            background: linear-gradient(135deg, #ff6a00, #ee0979);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .brand-text {
+            font-weight: 600;
+            font-size: 18px;
+            color: #1a1a2e;
+        }
+
+        .brand-text span { color: #ff6a00; }
+
+        .navbar-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        /* 全屏切换按钮 */
+        .icon-btn {
+            width: 38px;
+            height: 38px;
+            border: none;
+            border-radius: 10px;
+            background: transparent;
+            color: #5a5d6e;
+            font-size: 19px;
+            cursor: pointer;
+            transition: background 0.2s ease, color 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-btn:hover {
+            background: #f0f2f8;
+            color: #ff6a00;
+        }
+
+        /* ----- 聊天消息区域（滚动，内容居中限宽） ----- */
+        .chat-messages {
+            flex: 1;
+            width: 100%;
+            max-width: 860px;
+            margin: 0 auto;
+            overflow-y: auto;
+            padding: 28px 24px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        /* 欢迎区（作为聊天区第一块内容，随对话自然滚走） */
+        .welcome-block {
+            padding: 6px 4px 14px;
+        }
+
+        .welcome-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1a1a2e;
+            margin-bottom: 4px;
+        }
+
+        .welcome-sub {
+            font-size: 14px;
+            color: #8c8f9c;
+            margin-bottom: 16px;
+        }
+
+        .quick-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .chip {
+            background: #ffffff;
+            padding: 9px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            color: #1a1a2e;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid #e9ecf2;
+            user-select: none;
+        }
+
+        .chip:hover {
+            background: #f0f2f8;
+            border-color: #ff6a00;
+        }
+
+        .chip-primary {
+            background: #ff6a00;
+            color: white;
+            border-color: #ff6a00;
+        }
+
+        .chip-primary:hover {
+            background: #e55d00;
+        }
+
+        /* 消息气泡 */
+        .message {
+            max-width: 82%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            font-size: 15px;
+            line-height: 1.65;
+            word-wrap: break-word;
+            animation: fadeIn 0.3s ease;
+            white-space: pre-wrap;
+        }
+
+        .message-user {
+            align-self: flex-end;
+            background: #ff6a00;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message-assistant {
+            align-self: flex-start;
+            background: #ffffff;
+            color: #1a1a2e;
+            border: 1px solid #e9ecf2;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        /* 流式输出时的闪烁光标 */
+        .message.streaming .message-text::after {
+            content: '▍';
+            color: #ff6a00;
+            margin-left: 2px;
+            animation: cursorBlink 0.9s infinite;
+        }
+
+        @keyframes cursorBlink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        /* 引用来源 */
+        .citation-block {
+            margin-top: 10px;
+            padding: 10px 14px;
+            background: #f0f2f8;
+            border-radius: 12px;
+            font-size: 13px;
+            color: #5a5d6e;
+            border-left: 3px solid #ff6a00;
+        }
+
+        /* 错误提示 */
+        .error-block {
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: #fff1f0;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #d4380d;
+            border-left: 3px solid #d4380d;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ----- 底部输入区 ----- */
+        .input-area {
+            flex-shrink: 0;
+            background: #ffffff;
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+            padding: 14px 24px 18px;
+        }
+
+        .input-inner {
+            max-width: 860px;
+            margin: 0 auto;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .input-area input {
+            flex: 1;
+            padding: 13px 18px;
+            border: 1.5px solid #e9ecf2;
+            border-radius: 24px;
+            font-size: 15px;
+            outline: none;
+            transition: all 0.2s ease;
+            background: #f8f9fc;
+        }
+
+        .input-area input:focus {
+            border-color: #ff6a00;
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(255, 106, 0, 0.08);
+        }
+
+        .input-area button {
+            padding: 13px 26px;
+            background: #ff6a00;
+            color: white;
+            border: none;
+            border-radius: 24px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .input-area button:hover {
+            background: #e55d00;
+        }
+
+        .input-area button:disabled {
+            background: #d0d4e0;
+            cursor: not-allowed;
+        }
+
+        /* 加载动画（三点跳动，等待模型开始输出时显示） */
+        .typing-indicator {
+            display: none;
+            align-self: flex-start;
+            background: #ffffff;
+            padding: 14px 20px;
+            border-radius: 18px;
+            border-bottom-left-radius: 4px;
+            border: 1px solid #e9ecf2;
+            gap: 6px;
+        }
+
+        .typing-indicator.active { display: flex; }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: #b0b8c8;
+            border-radius: 50%;
+            animation: typingBounce 1.4s infinite ease-in-out both;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        .typing-dot:nth-child(3) { animation-delay: 0s; }
+
+        @keyframes typingBounce {
+            0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        /* 滚动条美化 */
+        .chat-messages::-webkit-scrollbar { width: 6px; }
+        .chat-messages::-webkit-scrollbar-track { background: transparent; }
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #d0d4e0;
+            border-radius: 8px;
+        }
+
+        /* 小屏幕适配 */
+        @media (max-width: 640px) {
+            .navbar { padding: 12px 16px; }
+            .chat-messages { padding: 20px 14px 14px; }
+            .message { max-width: 92%; }
+            .input-area { padding: 12px 14px 16px; }
+            .welcome-title { font-size: 19px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 顶部导航 -->
+    <div class="navbar">
+        <div class="navbar-brand">
+            <div class="brand-icon">AI</div>
+            <div class="brand-text">智能<span>导购</span></div>
+        </div>
+        <div class="navbar-actions">
+            <button class="icon-btn" id="fullscreenBtn" title="全屏">⤢</button>
+        </div>
+    </div>
+
+    <!-- 聊天消息区 -->
+    <div class="chat-messages" id="chatMessages">
+        <!-- 欢迎区 + 快捷指令 -->
+        <div class="welcome-block">
+            <div class="welcome-title">👋 你好，我是你的智能导购助手</div>
+            <div class="welcome-sub">你可以问我商品、求推荐、比价格，我会边想边打字回复你</div>
+            <div class="quick-chips">
+                <span class="chip chip-primary" data-question="帮我挑一款性价比高的手机">📱 帮我挑手机</span>
+                <span class="chip" data-question="送女朋友什么礼物好？">🎁 送礼推荐</span>
+                <span class="chip" data-question="2000元以内的蓝牙耳机推荐">🎧 蓝牙耳机</span>
+                <span class="chip" data-question="旅行背包什么牌子好？">🎒 旅行装备</span>
+            </div>
+        </div>
+
+        <!-- 助手欢迎消息 -->
+        <div class="message message-assistant">
+            <div class="message-text">您好！我是您的智能导购助手。可以向我提问任何购物相关的问题，我会尽力帮您找到最合适的商品。</div>
+            <div class="citation-block">💡 试试点击上面的快捷指令，或者直接输入您的问题。回答会实时流式显示。</div>
+        </div>
+
+        <!-- 加载指示器（等待模型开始输出时显示） -->
+        <div class="typing-indicator" id="typingIndicator">
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+        </div>
+    </div>
+
+    <!-- 底部输入区 -->
+    <div class="input-area">
+        <div class="input-inner">
+            <input type="text" id="questionInput" placeholder="输入您的问题..." />
+            <button id="sendBtn">发送</button>
+        </div>
+    </div>
+
+<script>
+    // ----- DOM 元素 -----
+    const messagesContainer = document.getElementById('chatMessages');
+    const typingIndicator = document.getElementById('typingIndicator');
+    const input = document.getElementById('questionInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+    let streaming = false;   // 是否正在接收流式回答（防止重复提交）
+
+    // ----- 全屏切换 -----
+    fullscreenBtn.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(() => {});
+        } else {
+            document.exitFullscreen().catch(() => {});
+        }
+    });
+
+    // 按 Esc 退出全屏等场景下同步按钮图标
+    document.addEventListener('fullscreenchange', () => {
+        fullscreenBtn.textContent = document.fullscreenElement ? '⤡' : '⤢';
+        fullscreenBtn.title = document.fullscreenElement ? '退出全屏' : '全屏';
+    });
+
+    // ----- 快捷指令点击 -----
+    document.querySelectorAll('.chip').forEach(chip => {
+        chip.addEventListener('click', function () {
+            const question = this.dataset.question;
+            if (question) {
+                input.value = question;
+                sendQuestion();
+            }
+        });
+    });
+
+    // ----- 发送消息（核心逻辑） -----
+    async function sendQuestion() {
+        const question = input.value.trim();
+        if (!question || streaming) return;
+
+        streaming = true;
+
+        // 1. 添加用户消息
+        addMessage(question, 'user');
+
+        // 2. 清空输入框、禁用按钮、显示加载动画
+        input.value = '';
+        sendBtn.disabled = true;
+        typingIndicator.classList.add('active');
+        scrollToBottom();
+
+        try {
+            // 3. 发起流式请求，实时渲染回答
+            await streamChat(question);
+        } catch (error) {
+            typingIndicator.classList.remove('active');
+            addMessage('❌ 网络请求失败，请检查服务是否启动。', 'assistant');
+            console.error(error);
+        } finally {
+            streaming = false;
+            typingIndicator.classList.remove('active');
+            sendBtn.disabled = false;
+            scrollToBottom();
+            input.focus();
+        }
+    }
+
+    // ----- 流式请求：解析 SSE 并实时渲染 -----
+    async function streamChat(question) {
+        const response = await fetch('/chat/stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question: question })
+        });
+
+        if (!response.ok || !response.body) {
+            throw new Error('HTTP ' + response.status);
+        }
+
+        // 创建助手气泡（带闪烁光标提示正在输出）
+        const msg = document.createElement('div');
+        msg.className = 'message message-assistant streaming';
+        const textEl = document.createElement('div');
+        textEl.className = 'message-text';
+        msg.appendChild(textEl);
+        messagesContainer.appendChild(msg);
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        let citations = [];
+        let gotText = false;
+        let errorText = null;
+
+        // 服务端每条 SSE 消息为 "data: {...}\n\n"，按空行切分解析
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            let sep;
+            while ((sep = buffer.indexOf('\n\n')) !== -1) {
+                const rawEvent = buffer.slice(0, sep);
+                buffer = buffer.slice(sep + 2);
+
+                for (const line of rawEvent.split('\n')) {
+                    if (!line.startsWith('data:')) continue;
+                    const payload = line.slice(5).trim();
+                    if (payload === '[DONE]') continue;
+
+                    let evt;
+                    try { evt = JSON.parse(payload); } catch (e) { continue; }
+
+                    if (evt.delta) {
+                        if (!gotText) {
+                            gotText = true;
+                            typingIndicator.classList.remove('active');
+                        }
+                        textEl.textContent += evt.delta;   // textContent 天然防 XSS
+                    } else if (evt.citations) {
+                        citations = evt.citations;
+                    } else if (evt.error) {
+                        errorText = evt.error;
+                        typingIndicator.classList.remove('active');
+                    }
+                }
+                scrollToBottom();
+            }
+        }
+
+        // 流结束：收尾处理
+        msg.classList.remove('streaming');
+
+        if (errorText) {
+            const err = document.createElement('div');
+            err.className = 'error-block';
+            err.textContent = '❌ ' + errorText;
+            msg.appendChild(err);
+        }
+        if (!gotText && !errorText) {
+            textEl.textContent = '（空回复）';
+        }
+        if (citations.length > 0) {
+            const cite = document.createElement('div');
+            cite.className = 'citation-block';
+            cite.textContent = '📚 参考来源: ' + citations.join('、');
+            msg.appendChild(cite);
+        }
+        scrollToBottom();
+    }
+
+    // ----- 辅助函数: 添加消息 -----
+    function addMessage(text, type) {
+        const msg = document.createElement('div');
+        msg.className = `message message-${type}`;
+        msg.textContent = text;
+        messagesContainer.appendChild(msg);
+        scrollToBottom();
+    }
+
+    // ----- 辅助函数: 滚动到底部 -----
+    function scrollToBottom() {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    // ----- 事件绑定 -----
+    sendBtn.addEventListener('click', sendQuestion);
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') sendQuestion();
+    });
+
+    // 页面加载完成后聚焦输入框
+    window.addEventListener('load', () => {
+        input.focus();
+    });
+</script>
+</body>
+</html>
